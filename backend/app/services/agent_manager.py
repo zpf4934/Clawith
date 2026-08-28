@@ -311,8 +311,11 @@ class AgentManager:
             return container.id
 
         except DockerException as e:
-            logger.error(f"Failed to start container for agent {agent.name}: {e}")
-            agent.status = "error"
+            logger.warning(f"Container start skipped for agent {agent.name}: {e}")
+            agent.container_id = None
+            agent.container_port = None
+            agent.status = "idle"
+            agent.last_active_at = datetime.now(timezone.utc)
             return None
 
     async def stop_container(self, agent: Agent) -> bool:

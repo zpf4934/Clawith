@@ -73,9 +73,18 @@ else
     echo -e "  ${GREEN}✓${NC} .env already exists"
 fi
 
+# If DATABASE_URL is already configured, keep it untouched and skip database provisioning.
+DB_SETUP_SKIPPED=false
+if grep -qE '^DATABASE_URL=.+' "$ROOT/.env" 2>/dev/null; then
+    DB_SETUP_SKIPPED=true
+fi
+
 # ── 2. PostgreSQL setup ──────────────────────────
 echo ""
-echo -e "${YELLOW}[2/6]${NC} Setting up PostgreSQL..."
+if [ "$DB_SETUP_SKIPPED" = true ]; then
+    echo -e "${YELLOW}[2/6]${NC} Skipping PostgreSQL setup (DATABASE_URL already configured)"
+else
+    echo -e "${YELLOW}[2/6]${NC} Setting up PostgreSQL..."
 
 # --- Helper: find psql binary ---
 find_psql() {
@@ -359,6 +368,8 @@ else
 fi
 echo -e "  ${GREEN}✓${NC} DATABASE_URL set (port $PG_PORT)"
 
+fi
+
 # ── 3. Backend setup ─────────────────────────────
 echo ""
 echo -e "${YELLOW}[3/6]${NC} Setting up backend..."
@@ -406,38 +417,43 @@ fi
 
 # ── 5. Database setup ────────────────────────────
 echo ""
-echo -e "${YELLOW}[5/6]${NC} Setting up database..."
-cd "$ROOT/backend"
-
-# Source .env for DATABASE_URL
-if [ -f "$ROOT/.env" ]; then
-    set -a
-    source "$ROOT/.env"
-    set +a
-fi
-
-# ── 6. Seed data ─────────────────────────────────
-echo ""
-echo -e "${YELLOW}[6/6]${NC} Running database seed..."
-
-if .venv/bin/python seed.py 2>&1 | while IFS= read -r line; do echo "  $line"; done; then
-    echo ""
+if [ "$DB_SETUP_SKIPPED" = true ]; then
+    echo -e "${YELLOW}[5/6]${NC} Skipping database setup (using configured DATABASE_URL)"
+    echo -e "${YELLOW}[6/6]${NC} Skipping database seed (using configured DATABASE_URL)"
 else
+    echo -e "${YELLOW}[5/6]${NC} Setting up database..."
+    cd "$ROOT/backend"
+
+    # Source .env for DATABASE_URL
+    if [ -f "$ROOT/.env" ]; then
+        set -a
+        source "$ROOT/.env"
+        set +a
+    fi
+
+    # ── 6. Seed data ─────────────────────────────────
     echo ""
-    echo -e "  ${RED}✗ Seed failed.${NC}"
-    echo "  Common fixes:"
-    echo "    1. Make sure PostgreSQL is running"
-    echo "    2. Set DATABASE_URL in .env, e.g.:"
-    echo "       DATABASE_URL=postgresql+asyncpg://clawith:clawith@localhost:5432/clawith?ssl=disable"
-    echo "    3. Create the database first:"
-    echo "       createdb clawith"
-    echo "    4. If you see 'Ident authentication failed', configure pg_hba.conf:"
-    echo "       Add this line BEFORE other host rules:"
-    echo "       host  all  clawith  127.0.0.1/32  md5"
-    echo "       Then reload: sudo systemctl reload postgresql"
-    echo ""
-    echo "  After fixing, re-run: bash setup.sh"
-    exit 1
+    echo -e "${YELLOW}[6/6]${NC} Running database seed..."
+
+    if .venv/bin/python seed.py 2>&1 | while IFS= read -r line; do echo "  $line"; done; then
+        echo ""
+    else
+        echo ""
+        echo -e "  ${RED}✗ Seed failed.${NC}"
+        echo "  Common fixes:"
+        echo "    1. Make sure PostgreSQL is running"
+        echo "    2. Set DATABASE_URL in .env, e.g.:"
+        echo "       DATABASE_URL=postgresql+asyncpg://clawith:clawith@localhost:5432/clawith?ssl=disable"
+        echo "    3. Create the database first:"
+        echo "       createdb clawith"
+        echo "    4. If you see 'Ident authentication failed', configure pg_hba.conf:"
+        echo "       Add this line BEFORE other host rules:"
+        echo "       host  all  clawith  127.0.0.1/32  md5"
+        echo "       Then reload: sudo systemctl reload postgresql"
+        echo ""
+        echo "  After fixing, re-run: bash setup.sh"
+        exit 1
+    fi
 fi
 
 # ── Summary ──────────────────────────────────────

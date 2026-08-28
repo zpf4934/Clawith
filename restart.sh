@@ -241,7 +241,7 @@ start_backend() {
             PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-}" \
             DATABASE_URL="$DATABASE_URL" \
             .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port $BACKEND_PORT
-    wait_for_port $BACKEND_PORT "Backend" 10
+    wait_for_port $BACKEND_PORT "Backend" 45
 }
 
 # ═══════════════════════════════════════════════════════
